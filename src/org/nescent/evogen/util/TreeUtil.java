@@ -1,8 +1,12 @@
 package org.nescent.evogen.util;
 
-import java.awt.image.BufferedImage;
 import java.awt.image.FilteredImageSource;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.FileReader;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -10,15 +14,10 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.ArrayList;
-import java.util.Hashtable;
 import java.util.List;
-import java.util.Set;
+import java.util.Properties;
 import java.util.Stack;
 
-import javax.imageio.ImageIO;
-
-import org.hibernate.Query;
-import org.hibernate.Session;
 import Acme.JPM.Encoders.GifEncoderNoCM;
 import com.eteks.awt.PJAImage;
 import com.eteks.filter.Web216ColorsFilter;
@@ -29,15 +28,52 @@ import com.eteks.filter.Web216ColorsFilter;
  */
 public class TreeUtil {
 	public static int TREE_DEPTH_ALL = -1;
+	String host="";
+    String user="";
+    String password="";
 	
-	
-	public int getLcaNode(String [] names)
+    public TreeUtil() throws Exception
 	{
-		int id=-1;
-		
-		return id;
+    	File f=new File("config.txt");
+		Properties props=new Properties();
+		InputStream in=new FileInputStream(f);
+		props.load(in);
+		if(props.containsKey("host"))
+			host=props.getProperty("host");
+	    
+		if(props.containsKey("user"))
+			user=props.getProperty("user");
+	    
+		if(props.containsKey("password"))
+			password=props.getProperty("password");
+	    
+		in.close();
 	}
-	
+    
+	public String getHost() {
+		return host;
+	}
+
+	public void setHost(String host) {
+		this.host = host;
+	}
+
+	public String getPassword() {
+		return password;
+	}
+
+	public void setPassword(String password) {
+		this.password = password;
+	}
+
+	public String getUser() {
+		return user;
+	}
+
+	public void setUser(String user) {
+		this.user = user;
+	}
+
 	
 	public int getLcaNode(int [] ids) throws Exception
 	{
@@ -94,39 +130,7 @@ public class TreeUtil {
 		}
 		return null;
 	}
-	public BufferedImage getTreeAsBufferedImage(String [] names, String treeSource) throws Exception
-	{
-		System.setProperty ("java.awt.headless", "true");
-		String nwk="";
-		
-		List trees=getTrees(names, treeSource);
-		if(trees.size()>0)
-		{
-			Object [] objs=(Object [])trees.get(0);  
-			int num=names.length;
-	    	int ids[]=new int[num];
-	    	
-	    	for(int j=0;j<objs.length-3;j++)
-	    	{
-	    		String id=String.valueOf(objs[j]);
-	    		ids[j]=Integer.parseInt(id);
-	    	}
-	    	
-	    	String tree_id=String.valueOf(objs.length-2);
-			
-			int lcaid=getLcaNode(ids);
-			if(lcaid!=-1)
-			{
-							
-				TreeNode node= getMinimiumTree(lcaid,ids,names);
-				DrawImageAwt di=new DrawImageAwt();
-				BufferedImage img=di.createImage(node);
-				
-				return img;
-			}
-		}
-		return null;
-	}
+	
 	public String getTreeAsNWK(String [] names, String treeSource) throws Exception
 	{
 		String nwk="";
@@ -344,9 +348,7 @@ public class TreeUtil {
 		    // The second and third arguments are the username and password,
 		    // respectively. They should be whatever is necessary to connect
 		    // to the database.
-		    String host="darwin.nescent.org";
-		    String user="xl24";
-		    String password="lxh72325";
+		    
 		    c = DriverManager.getConnection("jdbc:postgresql://"+host+"/biosql_dev",user, password);
 		    return c;
 		  } catch (Exception se) {
@@ -511,8 +513,8 @@ public class TreeUtil {
 		//int [] ids={11,11};
 		System.out.println(com.eteks.awt.PJAGraphicsManager.getDefaultGraphicsManager().getFontsPath()); 
 		
-		//System.out.println(util.getTreeAsNWK(names, "ITIS"));
-		/*
+		System.out.println(util.getTreeAsNWK(names, "ITIS"));
+	/*
 		try
 		{
 			System.setProperty ("java.awt.headless", "true");
@@ -533,8 +535,8 @@ public class TreeUtil {
 		{
 			System.out.println(e);
 		}
-*/
-		
+
+		*/
 		
 		try
 		{
@@ -543,7 +545,7 @@ public class TreeUtil {
 			
 			
 			PJAImage image=util.getTreeAsImage(names, "ITIS");
-			String fileName = "test.gif";
+			String fileName = "test1.gif";
 		    OutputStream out = new FileOutputStream (fileName);
 		    new GifEncoderNoCM (new FilteredImageSource (image.getSource (),
 		                                                     new Web216ColorsFilter ()),
