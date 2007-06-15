@@ -31,33 +31,46 @@ public class TreeNode {
 	}
 	public void simplify()
 	{
+		Object children[]=new Object[getChildrenCount()];
 		for(int i=0;i<getChildrenCount();i++)
 		{
-			TreeNode n=getChild(i);
+			children[i]=getChild(i);
+		}
+		
+		for(int i=0;i<children.length;i++)
+		{
+			TreeNode n =(TreeNode)children[i];
 			n.simplify();
 		}
-		if(getChildrenCount()==1)
+		
+		
+		for(int i=0;i<children.length;i++)
 		{
-			TreeNode p=parent;
-			if(p!=null)
+			
+			TreeNode n =(TreeNode)children[i];
+			if(n.getChildrenCount()==1)
 			{
-				TreeNode c=getChild(0);
-				p.addChild(c);
-				p.removeChild(this);
+				addChild(n.getChild(0));
+				removeChild(n);
 			}
 		}
 	}
 	public String toStringNWK()
 	{
-		String str="(";
+		String str="";
 		if(label!=null) str+=label;
+		if(children.size()>1 || parent==null) str+="(";
 		for(int i=0;i<children.size();i++)
 		{
 			if(i>0)str+=",";
 			TreeNode chd=getChild(i);
 			str+=chd.toStringNWK();
+			
 		}
-		str+=")";
+		if(children.size()>1 || parent==null) str+=")";
+		
+		if(parent==null)str+=";";
+		
 		return str;
 		
 	}
