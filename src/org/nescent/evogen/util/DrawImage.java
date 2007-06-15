@@ -1,15 +1,13 @@
 package org.nescent.evogen.util;
 
-import java.awt.Color;
-import java.awt.Graphics2D;
-import java.awt.image.BufferedImage;
-
+import com.eteks.awt.PJAGraphics;
+import com.eteks.awt.PJAImage;
 
 public class DrawImage {
 	int wu=50;
 	int hu=50;
 	
-    public void drawNode(Graphics2D g,TreeNode node, int x, int y) throws Exception
+    public void drawNode(PJAGraphics g,TreeNode node, int x, int y) throws Exception
     {
     	if(node.getChildrenCount()==0)
     	{
@@ -40,22 +38,23 @@ public class DrawImage {
     		}
     	}
     }
-	public BufferedImage createImage(TreeNode node) throws Exception
+	public PJAImage createImage(TreeNode node) throws Exception
 	{
 		int width = 10*wu+50*5;
 		int height=hu*node.getTipCount();
 	    // Create buffered image that does not support transparency
-	    BufferedImage bimage = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
-	    Graphics2D g2d = bimage.createGraphics();
+		PJAImage bimage = new PJAImage(width, height);
+	    PJAGraphics gd = (PJAGraphics)bimage.getGraphics();
 	    
 	    // Draw on the image
-	    g2d.setColor(Color.white);
-	    g2d.setBackground(Color.blue);
-	    drawNode(g2d,node,0,height/2);
+	    gd.setColor(0,0,255);
+	    
+	            
+	    drawNode(gd,node,0,height/2);
 	   
 		
 		//ImageIO.write(bimage, "jpg",new File("test.jpg"));
-	    g2d.dispose();
+	    gd.dispose();
 	    
 	    return bimage;  
 	    

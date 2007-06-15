@@ -1,9 +1,12 @@
 package org.nescent.evogen.util;
 
 import java.awt.image.BufferedImage;
-import java.io.File;
+import java.awt.image.FilteredImageSource;
+import java.io.FileOutputStream;
+import java.io.OutputStream;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.ArrayList;
@@ -16,12 +19,9 @@ import javax.imageio.ImageIO;
 
 import org.hibernate.Query;
 import org.hibernate.Session;
-import org.nescent.evogen.hibernate.Edge;
-import org.nescent.evogen.hibernate.HibernateSessionFactory;
-import org.nescent.evogen.hibernate.Node;
-import org.nescent.evogen.hibernate.NodeDAO;
-import org.nescent.evogen.hibernate.Tree;
-import org.nescent.evogen.hibernate.TreeDAO;
+import Acme.JPM.Encoders.GifEncoderNoCM;
+import com.eteks.awt.PJAImage;
+import com.eteks.filter.Web216ColorsFilter;
 
 /**
  * @author xianhua
@@ -39,7 +39,7 @@ public class TreeUtil {
 	}
 	
 	
-	public int getLcaNode(int [] ids)
+	public int getLcaNode(int [] ids) throws Exception
 	{
 		int id=-1;
 		
@@ -59,29 +59,11 @@ public class TreeUtil {
 	}
 	
 	
-	public List getTrees(String name_1, String name_2)
+	public PJAImage getTreeAsImage(String [] names, String treeSource) throws Exception
 	{
-		Session session =HibernateSessionFactory.getSession();
-		   
-		String sql="SELECT node_a.node_id as node_id1, node_b.node_id as node_id2, node_a.tree_id as tree_id " +
-    		" FROM node node_a, node node_b "+
-    		" WHERE node_a.tree_id = node_b.tree_id "+ 
-    		" AND   node_a.label = :name_1"+
-    		" AND   node_b.label = :name_2";
-    
-		
-		Query query = session.createSQLQuery(sql);
-		query.setString("name_1",name_1);
-		query.setString("name_2",name_2);
-     	
-	    List results= query.list();
-	    session.close();
-	    
-	    return results;
-	    
-	}
-	public BufferedImage getTreeAsImage(String [] names, String treeSource) throws Exception
-	{
+		System.setProperty ("java.awt.headless", "true");
+		//System.setProperty ("java.awt.fonts", "/Users/xl24");
+		//System.out.println(com.eteks.awt.PJAGraphicsManager.getDefaultGraphicsManager().getFontsPath()); 
 		String nwk="";
 		
 		List trees=getTrees(names, treeSource);
@@ -105,6 +87,39 @@ public class TreeUtil {
 							
 				TreeNode node= getMinimiumTree(lcaid,ids,names);
 				DrawImage di=new DrawImage();
+				PJAImage img=di.createImage(node);
+				
+				return img;
+			}
+		}
+		return null;
+	}
+	public BufferedImage getTreeAsBufferedImage(String [] names, String treeSource) throws Exception
+	{
+		System.setProperty ("java.awt.headless", "true");
+		String nwk="";
+		
+		List trees=getTrees(names, treeSource);
+		if(trees.size()>0)
+		{
+			Object [] objs=(Object [])trees.get(0);  
+			int num=names.length;
+	    	int ids[]=new int[num];
+	    	
+	    	for(int j=0;j<objs.length-3;j++)
+	    	{
+	    		String id=String.valueOf(objs[j]);
+	    		ids[j]=Integer.parseInt(id);
+	    	}
+	    	
+	    	String tree_id=String.valueOf(objs.length-2);
+			
+			int lcaid=getLcaNode(ids);
+			if(lcaid!=-1)
+			{
+							
+				TreeNode node= getMinimiumTree(lcaid,ids,names);
+				DrawImageAwt di=new DrawImageAwt();
 				BufferedImage img=di.createImage(node);
 				
 				return img;
@@ -112,7 +127,6 @@ public class TreeUtil {
 		}
 		return null;
 	}
-	
 	public String getTreeAsNWK(String [] names, String treeSource) throws Exception
 	{
 		String nwk="";
@@ -139,11 +153,8 @@ public class TreeUtil {
 				TreeNode node= getMinimiumTree(lcaid,ids,names);
 				nwk= node.toStringNWK();
 				//System.out.println(nwk);
-				nwk=cleanString(nwk);
-				if(!nwk.startsWith("("))
-					nwk="("+nwk+")";
-				if(!nwk.endsWith(";"))
-					nwk+=";";
+				
+				
 				
 			}
 		}
@@ -157,12 +168,12 @@ public class TreeUtil {
 	 * @return list of trees and node ids of the corresponding names in the trees. These information can be used
 	 *         to retrieve the LCA by calling getLcaNode(int [] ids) function  
 	 */
-	public List getTrees(String [] names, String treeSource)
+	public List getTrees(String [] names, String treeSource) throws Exception
 	{
 		if(names.length==0)
 			return new ArrayList();
 		
-		Session session =HibernateSessionFactory.getSession();
+		Connection conn =getConnection();
 		   
 		String sql="SELECT ";
 		
@@ -189,160 +200,68 @@ public class TreeUtil {
 		for(int i=0;i<names.length;i++)
 		{
 			if(i>0) sql+=" AND ";
-			sql+="node_" + i+".label=:name_" +i;
+			sql+="node_" + i+".label=?";//:name_" +i;
 		}
 		sql+=" AND tree.tree_id=node_0.tree_id ";
 		sql+=" AND tree.biodatabase_id =treesource.biodatabase_id ";
 		//System.out.println(sql);
-		Query query = session.createSQLQuery(sql);
+		
+		PreparedStatement psts=conn.prepareStatement(sql);
+		
 		for(int i=0;i<names.length;i++)
 		{
-			query.setString("name_"+i,names[i]);
+			psts.setString(i+1,names[i].trim());
 		}
 		
-	    List results= query.list();
-	    session.close();
-	    
+		ResultSet rs = psts.executeQuery();
+		ArrayList results=new ArrayList();
+		int num=names.length+3;
+	    while(rs.next())
+	    {
+	        String [] record=new String[num];
+	        for(int i=0;i<num;i++)
+	        {
+	        	record[i]=rs.getString(i+1);
+	        }
+	    	results.add(record);
+	    }
+
 	    return results;
 	    
 	}
-	public int getLcaNode(int id_1, int id_2)
+	public int getLcaNode(int id_1, int id_2) throws Exception
 	{
 		int id=-1;
 		
-		Session session =HibernateSessionFactory.getSession();
-	   /*
-		String sql="SELECT parent_node_id, distance "+
-    	" FROM node_path"+
-    	" WHERE (parent_node_id = :id_1 AND child_node_id = :id_2) OR "+ 
-    	"  (parent_node_id = :id_2 AND child_node_id = :id_1)" ; 
-    	Query query = session.createSQLQuery(sql);
-	    query.setInteger("id_1",id_1);
-	    query.setInteger("id_2",id_2);
-	     	
-	    query.setMaxResults(1);
-
-	    List results=query.list(); 
-	    if(results.size()==1)
-	    {
-	    	 Object [] objs=(Object [])results.get(0);  
-	    	 id=Integer.parseInt(String.valueOf(objs[0]));
-	    }
-	    else
-	    {
-		 */
+		Connection conn=getConnection();
 		String sql="SELECT lca.node_id, " +
 		    	" pA.distance AS distance_a, pB.distance AS distance_b" +
 		    	" FROM node lca, node_path pA, node_path pB "+
 		    	" WHERE pA.parent_node_id = pB.parent_node_id "+ 
 		    	" AND   lca.node_id = pA.parent_node_id " +
-		    	" AND   pA.child_node_id = :id_1"+
-		    	" AND   pB.child_node_id = :id_2" +
+		    	" AND   pA.child_node_id = ?"+
+		    	" AND   pB.child_node_id = ?" +
 		    	" ORDER BY pA.distance";
-		Query query = session.createSQLQuery(sql);
-		query.setInteger("id_1",id_1);
-		query.setInteger("id_2",id_2);
+		PreparedStatement psts = conn.prepareStatement(sql);
+		psts.setInt(1,id_1);
+		psts.setInt(2,id_2);
 		     	
-		query.setMaxResults(1);
-	
-		List results=query.list(); 
-		if(results.size()==1)
+		psts.setMaxRows(1);
+		ResultSet rs = psts.executeQuery();
+		
+		if(rs.next())
 		{
-		    	   
-		    Object [] objs=(Object [])results.get(0);  
-		    id=Integer.parseInt(String.valueOf(objs[0]));
+		    id=rs.getInt(1);
 		} 
 		else
 		{
 		   	 System.out.println("No LCA found");
 		
 	    }
-		session.close();
 		
 		return id;
 	}
 	
-	public String getTreeByName(String name, int depth)
-	{
-		String result="<?xml version=\"1.0\" encoding=\"UTF-8\"?>";
-		result+="<Response command=\"getTreeByName\">";
-		result+="	<Parameters>";
-		result+="		<Parameter name=\"name\">"+name+"</Parameter>";
-		result+="	<Parameters>";
-		
-		try
-		{
-			String str="";
-			TreeDAO treeDao=new TreeDAO();
-			List treeList=treeDao.findByName(name);
-			if(treeList.size()>0)
-			{
-				Tree tree=(Tree)treeList.get(0);
-				Node root=tree.getNode();
-				Set edges=root.getEdgesForParentNodeId();
-				if(edges.size()>0)
-				{
-					Edge edge=(Edge)edges.toArray()[0];
-					Node chd=edge.getNodeByChildNodeId();
-					str+=getChildren(chd, depth);
-				}
-				
-				result+="	<Result type=\"NWK\">" + str+"</Result>";
-			}
-			else
-			{
-				result+="	<Result type=\"message\">no tree found</Result>";
-			
-			}
-		}
-		catch(Exception e)
-		{
-			result+="	<Result type=\"error\">" + e.getMessage() +"</Result>";
-		}
-		
-		result+="</Response>";
-		
-		
-		
-		return result;
-	}
-	
-	public String getTreeById(String id, int depth)
-	{
-		String result="<?xml version=\"1.0\" encoding=\"UTF-8\"?>";
-		result+="<Response command=\"getTreeById\">";
-		result+="	<Parameters>";
-		result+="		<Parameter name=\"name\">"+id+"</Parameter>";
-		result+="		<Parameter name=\"depth\">"+depth+"</Parameter>";
-		result+="	<Parameters>";
-		
-		try
-		{
-			String str="";
-			NodeDAO nodeDao=new NodeDAO();
-			Node node=nodeDao.findById(Integer.valueOf(id));
-			if(node!=null)
-			{
-				str+=getChildren(node, depth);
-				result+="	<Result type=\"NWK\">" + str+"</Result>";
-			}
-			else
-			{
-				result+="	<Result type=\"message\">no tree found</Result>";
-			
-			}
-		}
-		catch(Exception e)
-		{
-			result+="	<Result type=\"error\">" + e.getMessage() +"</Result>";
-		}
-		
-		result+="</Response>";
-		
-		
-		
-		return result;
-	}
 	public TreeNode getMinimiumTree(int lcaid, int [] ids, String [] names) throws Exception
 	{
 		TreeNode root=new TreeNode();
@@ -436,47 +355,6 @@ public class TreeUtil {
 		    System.exit(1);
 		  }
 		  return null;
-	}
-	public String getMinimiumTree(Node node, Hashtable names)
-	{
-		if(node==null)
-			return "";
-		String str="";
-		Set edges=node.getEdgesForParentNodeId();
-		if(edges.size()>0)
-			str+="(";
-		
-		if(node.getLabel()!=null && names.containsKey(node.getLabel()))
-		{
-			str+=node.getLabel();
-		}
-		
-		for(int i=0;i<edges.size();i++)
-		{
-			Edge edge=(Edge)edges.toArray()[i];
-			Node chd=edge.getNodeByChildNodeId();
-			if(i!=0) str+=",";
-			{
-				str+=getMinimiumTree(chd, names);
-			}
-		}
-		if(edges.size()>0)
-			str+=")";
-		
-		
-		if(str.matches("[,|)|(]*"))
-			str="";
-		/*
-		if(str.endsWith(",)"))
-		{
-			str=str.substring(1,str.length()-2);	
-		}
-		if(str.startsWith("(,"))
-		{
-			str=str.substring(2,str.length()-1);	
-		}
-		*/
-		return str;
 	}
 	public String cleanString(String str)
 	{
@@ -586,6 +464,7 @@ public class TreeUtil {
 		}
 		return p;
 	}
+	/*
 	public String getChildren(Node node, int depth)
 	{
 		if(node==null)
@@ -621,20 +500,56 @@ public class TreeUtil {
 		}
 		return str;
 	}
-	public static void main(String [] agrs)
+	*/
+	public static void main(String [] agrs) throws Exception
 	{
 		TreeUtil util=new TreeUtil();
 		//String names[] ={"Graphis scripta", "Coniosporium apollinis","Siphula ceratites"};
-		String names[] ={"Carya alba", "Acer rubrum","Galactia regularis"};
-		//String names[] ={"Stenanthium densum", "Anticlea elegans","Amianthium muscitoxicum"};
+		//String names[] ={"Carya alba", "Acer rubrum","Galactia regularis"};
+		String names[] ={"Stenanthium densum", "Anticlea elegans","Amianthium muscitoxicum"};
 		//int [] ids={6287,6126,6494};
 		//int [] ids={11,11};
+		System.out.println(com.eteks.awt.PJAGraphicsManager.getDefaultGraphicsManager().getFontsPath()); 
+		
+		//System.out.println(util.getTreeAsNWK(names, "ITIS"));
+		/*
+		try
+		{
+			System.setProperty ("java.awt.headless", "true");
+			//System.out.println(util.getTreeAsNWK(names, "ITIS"));
+			
+			
+			BufferedImage image=util.getTreeAsBufferedImage(names, "ITIS");
+			String fileName = "test_buf.jpg";
+		    OutputStream out = new FileOutputStream (fileName);
+		    
+		    ImageIO.write(image,"png",out);
+		    
+		    out.close ();
+
+			
+		}
+		catch(Exception e)
+		{
+			System.out.println(e);
+		}
+*/
+		
 		
 		try
 		{
+			System.setProperty ("java.awt.headless", "true");
 			//System.out.println(util.getTreeAsNWK(names, "ITIS"));
-			BufferedImage img=util.getTreeAsImage(names, "ITIS");
-			ImageIO.write(img,"jpg",new File("test.jpg"));
+			
+			
+			PJAImage image=util.getTreeAsImage(names, "ITIS");
+			String fileName = "test.gif";
+		    OutputStream out = new FileOutputStream (fileName);
+		    new GifEncoderNoCM (new FilteredImageSource (image.getSource (),
+		                                                     new Web216ColorsFilter ()),
+		                            out).encode ();
+		        out.close ();
+
 			
 		}
 		catch(Exception e)
@@ -642,8 +557,8 @@ public class TreeUtil {
 			System.out.println(e);
 		}
 		
-		/*
 		
+		/*
 		List result=util.getTrees(names,"biosql_phylo");
 		for(int i=0;i<result.size();i++)
 		{

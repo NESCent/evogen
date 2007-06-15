@@ -24,5 +24,8 @@
 	<classpathentry kind="lib" path="C:/jaxws-ri/lib/sjsxp.jar"/>
 	<classpathentry kind="lib" path="C:/jaxws-ri/lib/stax-ex.jar"/>
 	<classpathentry kind="lib" path="C:/jaxws-ri/lib/streambuffer.jar"/>
+	<classpathentry kind="lib" path="C:/pja_2.5/lib/pja.jar"/>
+	<classpathentry kind="lib" path="C:/pja_2.5/lib/pjatools.jar"/>
+	<classpathentry kind="lib" path="C:/pja_2.5/lib/servlet.jar"/>
 	<classpathentry kind="output" path="WebRoot/WEB-INF/classes"/>
 </classpath>
